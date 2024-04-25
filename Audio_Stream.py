@@ -1,20 +1,23 @@
-from flask import Flask,Response,render_template
+
+from flask import Flask, Response, render_template
 import pyaudio
+import wave
 
-app=Flask(__name__,template_folder="template")
+app = Flask(__name__, template_folder="template")
 
-FORMAT=pyaudio.paInt16
-CHANNELS=2
-RATE=44100
-CHUNK=1024
-RECORD_SECONDS=5
+FORMAT = pyaudio.paInt16
+CHANNELS = 2
+RATE = 44100
+CHUNK = 1024
 
+audio_stream = pyaudio.PyAudio()
 
-audio_stream=pyaudio.PyAudio()
-
+# Load the recorded audio file
+audio_file_path = "path/to/your/recorded_audio.wav"
+wf = wave.open(audio_file_path, 'rb')
 
 def genHeader(sampleRate, bitsPerSample, channels):
-    datasize = 2000*10**6
+    datasize = wf.getnframes() * wf.getsampwidth()
     o = bytes("RIFF",'ascii')                                               # (4byte) Marks file as RIFF
     o += (datasize + 36).to_bytes(4,'little')                               # (4byte) File size in bytes excluding this and RIFF marker
     o += bytes("WAVE",'ascii')                                              # (4byte) File type
@@ -30,19 +33,17 @@ def genHeader(sampleRate, bitsPerSample, channels):
     o += (datasize).to_bytes(4,'little')                                    # (4byte) Data size in bytes
     return o
 
-
 def Sound():
-    bitspersample=16
-    wav_hader=genHeader(RATE,bitspersample,2)
-    stream=audio_stream.open(format=FORMAT,channels=2,rate=RATE,input=True,input_device_index=1,frames_per_buffer=CHUNK)
-    first_run=True
+    bitspersample = 16
+    wav_header = genHeader(RATE, bitspersample, 2)
+    first_run = True
     while True:
         if first_run:
-            data=wav_hader+stream.read(CHUNK)
-            first_run=False
+            data = wav_header + wf.readframes(CHUNK)
+            first_run = False
         else:
-            data=stream.read(CHUNK)
-        yield(data)
+            data = wf.readframes(CHUNK)
+        yield data
 
 @app.route('/')
 def index():
@@ -52,4 +53,4 @@ def index():
 def audio():
     return Response(Sound())
 
-app.run(host="127.0.0.1",port=5454,threaded=True)
+app.run(host="127.0.0.1", port=5454, threaded=True)
